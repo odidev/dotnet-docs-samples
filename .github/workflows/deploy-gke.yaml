@@ -10,7 +10,7 @@ env:
   CLUSTER: clouddemo-linux
   CLUSTER_ZONE: us-central1-a
 
-  REPOSITORY: clouddemo
+  REPOSITORY: gcr.io
   REPOSITORY_REGION: us-central1
 
   IMAGE: clouddemo
