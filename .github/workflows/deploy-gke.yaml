@@ -19,7 +19,11 @@ jobs:
           project_id: astral-subject-452906-a1
           service_account_key: ${{ secrets.GCP_SA_KEY }}
           export_default_credentials: true
-
+      - name: Build solution
+        run: |-
+          dotnet publish applications/clouddemo/netcore/CloudDemo.MvcCore.sln \
+            --configuration Release \
+            --framework net6.0
       - name: Build Docker image
         run: docker build -t githubactions-gke-demo_doc:'${{ github.sha }}' applications/clouddemo/netcore
 
