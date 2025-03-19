@@ -1,82 +1,44 @@
-name: Build and Deploy to GKE
+name: Deploy .NET app to GCP
 
 on:
+  workflow_dispatch:
   push:
-    branches:
-      - main
-
-env:
-  PROJECT_ID: astral-subject-452906-a1
-  PROJECT_NUMBER: 27210028263
-
-  CLUSTER: clouddemo-linux
-  CLUSTER_ZONE: us-central1-a
-
-  REPOSITORY: clouddemo
-  REPOSITORY_REGION: us-central1
-
-  IMAGE: clouddemo
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
+  deploy:
+    name: Deploy application to GKE
+    runs-on: self-hosted    # ubuntu-latest # Use GCP-hosted runner or self-hosted if preferred
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-    #
-    # Authenticate to Google Cloud using workload identity federation
-    #
-    - id: 'auth'
-      name: 'Obtain access token by using workload identity federation'
-      uses: 'google-github-actions/auth@v2'
-      with:
-        create_credentials_file: true
-        token_format: access_token
-        workload_identity_provider: projects/${{ env.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-actions/providers/github-actions-oidc
-        service_account: akhand@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: astral-subject-452906-a1
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
 
-    - name: Connect to Artifact Registry
-      run: |-
-        echo ${{ steps.auth.outputs.access_token }} | docker login -u oauth2accesstoken --password-stdin https://${{ env.REPOSITORY_REGION }}-docker.pkg.dev
+      - name: Build Docker image
+        run: docker build -t githubactions-gke-demo_doc:'${{ github.sha }}' applications/clouddemo/netcore
 
-    - name: Connect to GKE
-      uses: google-github-actions/get-gke-credentials@v0
-      with:
-        cluster_name: ${{ env.CLUSTER }}
-        location: ${{ env.CLUSTER_ZONE }}
+#      - name: Authenticate to Google Container Registry (GCR)
+#        run: |
+#          gcloud auth activate-service-account --key-file=${{ secrets.GCP_SA_KEY }}
+#          gcloud config set account akhand@astral-subject-452906-a1.iam.gserviceaccount.com
+#          gcloud auth configure-docker
 
-    #
-    # Build the .NET code
-    #
-    - name: Build solution
-      run: |-
-        dotnet publish applications/clouddemo/netcore/CloudDemo.MvcCore.sln \
-            --configuration Release \
-            --framework net6.0
+      - name: Tag and push Docker image to GCR
+        run: |
+          docker tag githubactions-gke-demo_doc:'${{ github.sha }}' gcr.io/astral-subject-452906-a1/githubactions-gke-demo_doc:'${{ github.sha }}'
+          docker push gcr.io/astral-subject-452906-a1/githubactions-gke-demo_doc:'${{ github.sha }}'
 
-    #
-    # Build the Docker image and push it to Artifact Registry
-    #
-    - name: Create image tag
-      run: echo "IMAGE_TAG=${{ env.REPOSITORY_REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE }}:$GITHUB_SHA" >> $GITHUB_ENV
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials gke-demo-cluster \
+            --region us-central1 \
+            --project astral-subject-452906-a1
 
-    - name: Lock image version in deployment.yaml
-      run: sed -i 's|CLOUDDEMO_IMAGE|${{ env.IMAGE_TAG }}|g' applications/clouddemo/netcore/deployment.yaml
-
-    - name: Build Docker image
-      run: docker build --tag "${{ env.IMAGE_TAG }}" applications/clouddemo/netcore
-
-    - name: Publish Docker image to Google Artifact Registry
-      run: docker push "${{ env.IMAGE_TAG }}"
-
-    #
-    # Deploy to GKE
-    #
-    - name: Deploy to GKE
-      run: kubectl apply -f applications/clouddemo/netcore/deployment.yaml
-    
+      - name: Deploy application to GKE
+        run: kubectl apply -f applications/clouddemo/netcore/deployment.yaml
