@@ -62,7 +62,7 @@ spec:
     spec:
       containers:
       - name: clouddemo-netcore
-        image: CLOUDDEMO_IMAGE
+        image: gcr.io/astral-subject-452906-a1/githubactions-gke-demo_doc:'${{ github.sha }}' 
         ports:
           - containerPort: 8080
         livenessProbe:      # Used by deployment controller
