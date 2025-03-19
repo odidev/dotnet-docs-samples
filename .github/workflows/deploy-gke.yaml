@@ -7,10 +7,10 @@ env:
   PROJECT_ID: astral-subject-452906-a1
   PROJECT_NUMBER: 27210028263
 
-  CLUSTER: clouddemo-linux
+  CLUSTER: gke-demo-cluster
   CLUSTER_ZONE: us-central1-a
 
-  REPOSITORY: gcr.io
+  REPOSITORY: clouddemo
   REPOSITORY_REGION: us-central1
 
   IMAGE: clouddemo
